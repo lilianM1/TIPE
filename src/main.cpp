@@ -306,6 +306,8 @@ void loop()
     break;
 
   case CONSTELLATION:
+  {
+    // 1. Toujours écouter le bouton d'arrêt pour revenir au menu
     if (digitalRead(PIN_BTN) == LOW)
     {
       smartDelay(20);
@@ -319,8 +321,44 @@ void loop()
           while (GPS_SERIAL.available())
             gps.encode(GPS_SERIAL.read());
         }
+        break; // Sort du case
       }
     }
+
+    // 2. Le mode Suivi Sidéral (Tracking)
+    static unsigned long lastTrackingCheck = 0;
+
+    // On vérifie l'alignement toutes les 2 secondes (2000 ms)
+    if (millis() - lastTrackingCheck > 2000)
+    {
+      // On récupère la cible actuellement sélectionnée
+      uint8_t idxGlobal = pages[pageActuelle].debut + indexSurPage;
+      InfoConstellation cible = toutesConstellations[idxGlobal];
+
+      // On récupère le temps GPS ACTUEL (la Terre a tourné !)
+      double lat = gps.location.lat();
+      double lon = gps.location.lng();
+      int year = gps.date.year();
+      int month = gps.date.month();
+      int day = gps.date.day();
+      double utc = gps.time.hour() + gps.time.minute() / 60.0 + gps.time.second() / 3600.0;
+
+      // On recalcule les nouvelles coordonnées théoriques
+      double tAlt, tAz;
+      equatorialToHorizon(cible.ra_deg, cible.dec_deg, lat, lon,
+                          year, month, day, utc, tAlt, tAz);
+
+      targetAlt = tAlt;
+      targetAz = tAz;
+
+      // On lance le micro-ajustement avec des tolérances ultra-fines !
+      // 0.1° en Altitude et 0.2° en Azimut
+      ajusterPasBoucleFermee(targetAlt, targetAz, 0.1, 0.2);
+
+      // On réarme le chrono pour la prochaine vérification
+      lastTrackingCheck = millis();
+    }
     break;
+  }
   }
 }
