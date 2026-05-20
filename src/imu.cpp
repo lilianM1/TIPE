@@ -47,9 +47,19 @@ void readBNOAltAz(float &alt, float &az)
     imu::Quaternion q = bno.getQuat();
     bno.getCalibration(&calSys, &calGyr, &calAcc, &calMag);
     float qw = q.w(), qx = q.x(), qy = q.y(), qz = q.z();
-    float rawYaw = -degrees(atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz)));
-    az = fmod((rawYaw + 360.0), 360.0);
-    if (az < 0)
-        az += 360.0;
-    alt = degrees(atan2(2.0 * (qw * qx + qy * qz), 1.0 - 2.0 * (qx * qx + qy * qy)));
+
+    // Au lieu des angles d'Euler, on projette le vecteur "Avant" de ton capteur.
+    // Projection de l'axe de visée sur la verticale (Altitude)
+    float vecteurZ = 2.0 * (qy * qz + qw * qx);
+    alt = degrees(asin(constrain(vecteurZ, -1.0, 1.0)));
+
+    // Projection de l'axe de visée sur le plan horizontal (Boussole/Azimut)
+    float vecteurX = 2.0 * (qx * qy - qw * qz);
+    float vecteurY = 1.0 - 2.0 * (qx * qx + qz * qz);
+    
+    float rawYaw = degrees(atan2(vecteurX, vecteurY));
+    
+    // (Ajuste le signe - selon le sens de montage physique de ton BNO055)
+    az = fmod((-rawYaw + 360.0), 360.0);
+    if (az < 0) az += 360.0;
 }

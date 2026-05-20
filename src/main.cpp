@@ -106,6 +106,18 @@ void setup()
 // ==================== LOOP ====================
 void loop()
 {
+  // --- SAUVEGARDE MANUELLE DE LA CALIBRATION ---
+  // Si tu envoies un 'S' majuscule ou minuscule depuis le moniteur série du PC
+  if (Serial.available() > 0)
+  {
+    char cmd = Serial.read();
+    if (cmd == 'S' || cmd == 's')
+    {
+      saveOffsets();
+      faireBip(500); // Un long bip pour confirmer que c'est bien écrit dans l'EEPROM !
+    }
+  }
+  // ---------------------------------------------
   while (GPS_SERIAL.available())
   {
     gps.encode(GPS_SERIAL.read());
