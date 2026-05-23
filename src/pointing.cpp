@@ -25,14 +25,15 @@ bool ajusterPasBoucleFermee(float cibleAlt, float cibleAz, float tolAlt = 0.5, f
         pas_Z_total = errAz * PAS_PAR_DEG_Z;
     }
     long abs_Z = abs(pas_Z_total);
-    // Inversion de direction car le moteur est branché sur E1
-    bool dir_Z = (pas_Z_total > 0) ? LOW : HIGH; 
+    
+    // CORRECTION 1 : Si le télescope fuit la cible au lieu de s'en approcher,
+    // remplace "LOW : HIGH" par "HIGH : LOW" ici.
+    bool dir_Z = (pas_Z_total > 0) ? HIGH : LOW; 
     int inc_Z = (pas_Z_total > 0) ? 1 : -1;
 
     // --- 2. CALCUL DES PAS A FAIRE POUR Y (ALTITUDE) ---
     long pas_Y_total = 0;
     if (fabs(errAlt) > tolAlt && cibleAlt < THETA_MAX) {
-        // Cinématique inverse : on calcule la longueur exacte de la tige filetée
         float cosT_actuel = cos(realAltCible * PI / 180.0);
         float L_actuel = sqrt(88400.0 - 88000.0 * cosT_actuel);
         
@@ -42,10 +43,12 @@ bool ajusterPasBoucleFermee(float cibleAlt, float cibleAz, float tolAlt = 0.5, f
         pas_Y_total = (L_cible - L_actuel) * PAS_PAR_MM_Y;
     }
     long abs_Y = abs(pas_Y_total);
-    bool dir_Y = (pas_Y_total > 0) ? LOW : HIGH; // LOW = Montée, HIGH = Descente
+    
+    // Idem pour Y : si le télescope descend au lieu de monter, inverse LOW et HIGH
+    bool dir_Y = (pas_Y_total > 0) ? LOW : HIGH; 
     int inc_Y = (pas_Y_total > 0) ? 1 : -1;
 
-    // --- 3. ALGORITHME DE BRESENHAM (MOUVEMENT SIMULTANÉ ET FLUIDE) ---
+    // --- 3. ALGORITHME DE BRESENHAM ---
     if (abs_Y > 0 || abs_Z > 0) {
         mouvement = true;
         
@@ -56,14 +59,28 @@ bool ajusterPasBoucleFermee(float cibleAlt, float cibleAz, float tolAlt = 0.5, f
         bool y_is_master = (abs_Y >= abs_Z);
 
         for (long i = 0; i < master_pas; i++) {
-            // Arrêt d'urgence (retour au menu immédiat si bouton pressé)
+            // Arrêt d'urgence matériel
             if (digitalRead(PIN_BTN) == LOW) return true;
 
-            // --- ACTUALISATION LCD (Toutes les 250ms max) ---
+            // --- ACTUALISATION ET VRAIE BOUCLE FERMÉE (Tous les 250ms) ---
             if (millis() - lastLcdUpdate >= 250) {
+                lastLcdUpdate = millis(); // Ne pas oublier de reset le timer !
+                
                 float tempAlt, tempAz;
-                readBNOAltAz(tempAlt, tempAz); // Lecture de l'angle en direct
+                readBNOAltAz(tempAlt, tempAz); 
                 actualiserLCD(tempAlt, tempAz, true, cibleAlt, cibleAz);
+
+                // CORRECTION 2 : On vérifie si on est arrivé "en chemin"
+                float currentErrAz = cibleAz - tempAz;
+                while (currentErrAz > 180) currentErrAz -= 360;
+                while (currentErrAz < -180) currentErrAz += 360;
+                
+                float currentErrAlt = cibleAlt - tempAlt;
+
+                // Si on est rentré dans les tolérances, on casse la boucle !
+                if (fabs(currentErrAz) <= tolAz && fabs(currentErrAlt) <= tolAlt) {
+                    break; 
+                }
             }
             // ------------------------------------------------
 
@@ -87,11 +104,10 @@ bool ajusterPasBoucleFermee(float cibleAlt, float cibleAz, float tolAlt = 0.5, f
                 }
             }
 
-            // Exécution du pas Y (Altitude) avec sécurité matérielle
+            // Exécution du pas Y (Altitude)
             if (step_Y) {
-                // Si on descend (HIGH) et que le fin de course est déclenché
                 if (dir_Y == HIGH && digitalRead(Y_MIN_PIN) != LOW) {
-                    break; // Arrêt de l'axe pour protéger la mécanique
+                    break; // Fin de course
                 }
                 fairePas(Y_STEP_PIN, Y_DIR_PIN, dir_Y, V_Y);
                 posStepsY += inc_Y;
@@ -105,7 +121,7 @@ bool ajusterPasBoucleFermee(float cibleAlt, float cibleAz, float tolAlt = 0.5, f
         }
     }
 
-    return (!mouvement); // Retourne TRUE si la cible est atteinte
+    return (!mouvement);
 }
 
 bool pointerVersCible()
