@@ -27,7 +27,8 @@ void setup()
   digitalWrite(PIN_BEEP, LOW);
 
   // Attachement de l'interruption pour l'encodeur
-  attachInterrupt(digitalPinToInterrupt(PIN_ENC_A), ISR_encodeur, CHANGE);
+  // Écouter la fin du cran (RISING) stabilise parfaitement les deux directions
+  attachInterrupt(digitalPinToInterrupt(PIN_ENC_A), ISR_encodeur, RISING);
 
   pinMode(Y_STEP_PIN, OUTPUT);
   pinMode(Y_DIR_PIN, OUTPUT);
@@ -248,7 +249,7 @@ void loop()
         effacerCurseurMenu(ancienIndexSurPage);
         afficherCurseurMenu(indexSurPage);
       }
-      faireBip(15);
+      // faireBip(15);
     }
 
     if (digitalRead(PIN_BTN) == LOW)
@@ -285,7 +286,7 @@ void loop()
         actualiserCibleBarre(true);
         actualiserCibleBarre(true);
 
-        faireBip(150);
+        // faireBip(150);
         etatActuel = POINTING;
 
         while (digitalRead(PIN_BTN) == LOW)
