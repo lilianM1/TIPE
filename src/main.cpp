@@ -58,7 +58,7 @@ void setup()
   }
   else
   {
-    loadOffsets();
+    // loadOffsets();
     bno.setExtCrystalUse(true);
     Wire.setClock(400000);
     afficherAlerte("BNO055 ready", 0x07E0, 0x0000);
@@ -129,14 +129,23 @@ void loop()
   }
 
   StatutSysteme statut = verifierSysteme();
-  if (statut == ERREUR_MATERIELLE)
+  if (statut == ERREUR_BNO)
   {
     effacerEcran(0x0000);
-    afficherAlerte("ERREUR CAPTEUR !", 0xF800, 0xFFFF);
+    afficherAlerte("PANNE BNO055", 0xF800, 0xFFFF);
     while (1)
-      ;
+      ; // On bloque le système
   }
-  if (statut == PAS_DE_FIX)
+  else if (statut == ERREUR_GPS)
+  {
+    effacerEcran(0x0000);
+    afficherAlerte("PANNE CABLAGE GPS", 0xF800, 0xFFFF);
+    while (1)
+      ; // On bloque le système
+  }
+  // Fin du nouveau bloc
+
+  else if (statut == PAS_DE_FIX)
   {
     if (millis() - dernierClignotement > 500)
     {
