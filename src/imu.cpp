@@ -60,6 +60,6 @@ void readBNOAltAz(float &alt, float &az)
     float rawYaw = degrees(atan2(vecteurX, vecteurY));
     
     // (Ajuste le signe - selon le sens de montage physique de ton BNO055)
-    az = fmod((-rawYaw + 360.0), 360.0);
+    az = fmod((rawYaw + 360.0), 360.0);
     if (az < 0) az += 360.0;
 }

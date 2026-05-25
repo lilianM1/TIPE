@@ -14,72 +14,83 @@ bool ajusterPasBoucleFermee(float cibleAlt, float cibleAz, float tolAlt = 0.5, f
     float errAz = cibleAz - realAzCible;
 
     // Normalisation de l'erreur d'azimut (chemin le plus court)
-    while (errAz > 180) errAz -= 360;
-    while (errAz < -180) errAz += 360;
+    while (errAz > 180)
+        errAz -= 360;
+    while (errAz < -180)
+        errAz += 360;
 
     bool mouvement = false;
 
     // --- 1. CALCUL DES PAS A FAIRE POUR Z (AZIMUT) ---
     long pas_Z_total = 0;
-    if (fabs(errAz) > tolAz) {
+    if (fabs(errAz) > tolAz)
+    {
         pas_Z_total = errAz * PAS_PAR_DEG_Z;
     }
     long abs_Z = abs(pas_Z_total);
-    
+
     // CORRECTION 1 : Si le télescope fuit la cible au lieu de s'en approcher,
     // remplace "LOW : HIGH" par "HIGH : LOW" ici.
-    bool dir_Z = (pas_Z_total > 0) ? HIGH : LOW; 
+    bool dir_Z = (pas_Z_total > 0) ? LOW : HIGH;
     int inc_Z = (pas_Z_total > 0) ? 1 : -1;
 
     // --- 2. CALCUL DES PAS A FAIRE POUR Y (ALTITUDE) ---
     long pas_Y_total = 0;
-    if (fabs(errAlt) > tolAlt && cibleAlt < THETA_MAX) {
+    if (fabs(errAlt) > tolAlt && cibleAlt < THETA_MAX)
+    {
         float cosT_actuel = cos(realAltCible * PI / 180.0);
         float L_actuel = sqrt(88400.0 - 88000.0 * cosT_actuel);
-        
+
         float cosT_cible = cos(cibleAlt * PI / 180.0);
         float L_cible = sqrt(88400.0 - 88000.0 * cosT_cible);
-        
+
         pas_Y_total = (L_cible - L_actuel) * PAS_PAR_MM_Y;
     }
     long abs_Y = abs(pas_Y_total);
-    
+
     // Idem pour Y : si le télescope descend au lieu de monter, inverse LOW et HIGH
-    bool dir_Y = (pas_Y_total > 0) ? LOW : HIGH; 
+    bool dir_Y = (pas_Y_total > 0) ? LOW : HIGH;
     int inc_Y = (pas_Y_total > 0) ? 1 : -1;
 
     // --- 3. ALGORITHME DE BRESENHAM ---
-    if (abs_Y > 0 || abs_Z > 0) {
+    if (abs_Y > 0 || abs_Z > 0)
+    {
         mouvement = true;
-        
+
         long master_pas = max(abs_Y, abs_Z);
         long slave_pas = min(abs_Y, abs_Z);
         long err = master_pas / 2;
-        
+
         bool y_is_master = (abs_Y >= abs_Z);
 
-        for (long i = 0; i < master_pas; i++) {
+        for (long i = 0; i < master_pas; i++)
+        {
             // Arrêt d'urgence matériel
-            if (digitalRead(PIN_BTN) == LOW) return true;
+            if (digitalRead(PIN_BTN) == LOW)
+                return true;
 
             // --- ACTUALISATION ET VRAIE BOUCLE FERMÉE (Tous les 250ms) ---
-            if (millis() - lastLcdUpdate >= 250) {
-                lastLcdUpdate = millis(); // Ne pas oublier de reset le timer !
-                
+            // --- ACTUALISATION ET VRAIE BOUCLE FERMÉE (Tous les 250ms) ---
+            if (millis() - lastLcdUpdate >= 250)
+            {
+
                 float tempAlt, tempAz;
-                readBNOAltAz(tempAlt, tempAz); 
+                readBNOAltAz(tempAlt, tempAz);
                 actualiserLCD(tempAlt, tempAz, true, cibleAlt, cibleAz);
 
                 // CORRECTION 2 : On vérifie si on est arrivé "en chemin"
                 float currentErrAz = cibleAz - tempAz;
-                while (currentErrAz > 180) currentErrAz -= 360;
-                while (currentErrAz < -180) currentErrAz += 360;
-                
+                while (currentErrAz > 180)
+                    currentErrAz -= 360;
+                while (currentErrAz < -180)
+                    currentErrAz += 360;
+
                 float currentErrAlt = cibleAlt - tempAlt;
 
                 // Si on est rentré dans les tolérances, on casse la boucle !
-                if (fabs(currentErrAz) <= tolAz && fabs(currentErrAlt) <= tolAlt) {
-                    break; 
+                if (fabs(currentErrAz) <= tolAz && fabs(currentErrAlt) <= tolAlt)
+                {
+                    break;
                 }
             }
             // ------------------------------------------------
@@ -88,25 +99,32 @@ bool ajusterPasBoucleFermee(float cibleAlt, float cibleAz, float tolAlt = 0.5, f
             bool step_Z = false;
 
             // Logique de distribution des pas
-            if (y_is_master) {
+            if (y_is_master)
+            {
                 step_Y = true;
                 err -= slave_pas;
-                if (err < 0) {
+                if (err < 0)
+                {
                     step_Z = true;
                     err += master_pas;
                 }
-            } else {
+            }
+            else
+            {
                 step_Z = true;
                 err -= slave_pas;
-                if (err < 0) {
+                if (err < 0)
+                {
                     step_Y = true;
                     err += master_pas;
                 }
             }
 
             // Exécution du pas Y (Altitude)
-            if (step_Y) {
-                if (dir_Y == HIGH && digitalRead(Y_MIN_PIN) != LOW) {
+            if (step_Y)
+            {
+                if (dir_Y == HIGH && digitalRead(Y_MIN_PIN) != LOW)
+                {
                     break; // Fin de course
                 }
                 fairePas(Y_STEP_PIN, Y_DIR_PIN, dir_Y, V_Y);
@@ -114,7 +132,8 @@ bool ajusterPasBoucleFermee(float cibleAlt, float cibleAz, float tolAlt = 0.5, f
             }
 
             // Exécution du pas Z (Azimut)
-            if (step_Z) {
+            if (step_Z)
+            {
                 fairePas(Z_STEP_PIN, Z_DIR_PIN, dir_Z, V_Z);
                 posStepsZ += inc_Z;
             }
